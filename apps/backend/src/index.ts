@@ -13,22 +13,53 @@ import cors from 'cors';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Настройка CORS для Replit
+app.use(cors({
+    origin: ['https://gost-search-app-.aygren.repl.co', 'http://localhost:3000'],
+    credentials: true
+}));
+
 app.use(express.json());
 
+// Статические файлы для Replit
+app.use(express.static(path.join(__dirname, '../../')));
+
+// Корневой маршрут для проверки работы API
+app.get('/api', (_req: Request, res: Response) => {
+    res.json({
+        message: 'GOST Search API is running!',
+        endpoints: {
+            health: '/health',
+            gigachat: '/gigachat',
+            tavily: '/tavily'
+        }
+    });
+});
+
 app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok' });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 app.use('/gigachat', gigachatRouter);
 app.use('/tavily', tavilyRouter);
 
-app.listen(PORT, () => {
-    console.log(`Backend listening on port ${PORT}`);
+// Fallback для SPA
+app.get('*', (_req: Request, res: Response) => {
+    res.sendFile(path.join(__dirname, '../../index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Backend listening on port ${PORT}`);
+    console.log(`📡 API available at: http://localhost:${PORT}`);
+    console.log(`🌐 Frontend available at: http://localhost:${PORT}`);
+
     if (!process.env.TAVILY_API_KEY) {
-        console.error('TAVILY_API_KEY is not set. Please check your .env file in apps/backend.');
+        console.error('⚠️  TAVILY_API_KEY is not set. Please check your environment variables.');
     }
-    if (!process.env.GIGACHAT_AUTH_KEY) {
-        console.error('GIGACHAT_AUTH_KEY is not set. Please check your .env file in apps/backend.');
+    if (!process.env.GIGACHAT_CLIENT_ID) {
+        console.error('⚠️  GIGACHAT_CLIENT_ID is not set. Please check your environment variables.');
+    }
+    if (!process.env.GIGACHAT_CLIENT_SECRET) {
+        console.error('⚠️  GIGACHAT_CLIENT_SECRET is not set. Please check your environment variables.');
     }
 }); 

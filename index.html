@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Найди ГОСТ - Поиск и анализ нормативных документов</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .5;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Найди ГОСТ</h1>
+            <p class="text-lg text-gray-600">Поиск и анализ российских нормативных документов с ИИ</p>
+        </header>
+
+        <!-- Search Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <form id="searchForm" class="flex gap-4">
+                <input type="text" id="searchInput" placeholder="Найдите ГОСТ, СНиП или другой нормативный документ..."
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required>
+                <button type="submit" id="searchBtn"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    Найти
+                </button>
+            </form>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="space-y-4"></div>
+
+        <!-- Analysis -->
+        <div id="analysis" class="bg-white rounded-lg shadow-md p-6 mt-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Анализ документа</h2>
+            <div id="analysisContent" class="prose max-w-none">
+                <div class="text-center text-gray-500">
+                    <div
+                        class="loading inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full">
+                    </div>
+                    <p class="mt-2">Анализируем документ...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            const searchBtn = document.getElementById('searchBtn');
+            const resultsDiv = document.getElementById('results');
+
+            // Показываем загрузку
+            searchBtn.disabled = true;
+            searchBtn.textContent = 'Поиск...';
+            resultsDiv.innerHTML = '<div class="text-center"><div class="loading inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div><p class="mt-2">Ищем документы...</p></div>';
+
+            try {
+                // Поиск документов
+                const searchResponse = await fetch(`${API_BASE}/tavily/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                if (!searchResponse.ok) {
+                    throw new Error('Ошибка поиска');
+                }
+
+                const searchData = await searchResponse.json();
+                const results = searchData.results || [];
+
+                // Показываем результаты
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="text-center text-gray-500">Документы не найдены</div>';
+                    return;
+                }
+
+                resultsDiv.innerHTML = results.map((result, index) => `
+                    <div class="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow" onclick="analyzeDocument('${result.url}', '${result.title.replace(/'/g, "\\'")}')">
+                        <h3 class="font-semibold text-blue-600 mb-2">${result.title}</h3>
+                        <p class="text-sm text-gray-600 mb-2">${result.content}</p>
+                        <a href="${result.url}" target="_blank" class="text-xs text-blue-500 hover:underline">Открыть документ</a>
+                    </div>
+                `).join('');
+
+                // Автоматически анализируем первый результат
+                if (results.length > 0) {
+                    analyzeDocument(results[0].url, results[0].title);
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="text-center text-red-500">Ошибка: ${error.message}</div>`;
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.textContent = 'Найти';
+            }
+        });
+
+        async function analyzeDocument(url, title) {
+            const analysisDiv = document.getElementById('analysis');
+            const analysisContent = document.getElementById('analysisContent');
+
+            analysisDiv.classList.remove('hidden');
+            analysisContent.innerHTML = `
+                <div class="text-center text-gray-500">
+                    <div class="loading inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                    <p class="mt-2">Анализируем документ...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`${API_BASE}/gigachat/completion`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: 'Проанализируй этот нормативный документ и сделай краткую выжимку основных требований и положений.',
+                        url: url,
+                        title: title
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Ошибка анализа');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let content = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.substring(6);
+                            if (jsonStr.includes('[DONE]')) break;
+
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const contentChunk = parsed.choices?.[0]?.delta?.content;
+                                if (contentChunk) {
+                                    content += contentChunk;
+                                    analysisContent.innerHTML = `<div class="whitespace-pre-wrap">${content}</div>`;
+                                }
+                            } catch (e) {
+                                // Игнорируем ошибки парсинга
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                analysisContent.innerHTML = `<div class="text-center text-red-500">Ошибка анализа: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+
+</html>

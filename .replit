@@ -1,0 +1,27 @@
+language = "nodejs"
+run = "pnpm dev:backend"
+entrypoint = "apps/backend/src/index.ts"
+
+[nix]
+channel = "stable-23_11"
+
+[env]
+NODE_ENV = "production"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+
+[languages.javascript]
+pattern = "**/*.{js,jsx,ts,tsx}"
+syntax = "javascript"
+
+[languages.javascript.languageServer]
+start = [ "typescript-language-server", "--stdio" ]
+
+[deployment]
+run = ["sh", "-c", "pnpm install && pnpm dev:backend"]
+deploymentTarget = "cloudrun" 
