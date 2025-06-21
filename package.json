@@ -1,0 +1,23 @@
+{
+    "name": "gost-monorepo",
+    "description": "Monorepo for GOST search and analysis application",
+    "private": true,
+    "version": "0.1.0",
+    "workspaces": [
+        "apps/frontend",
+        "apps/backend",
+        "packages/shared"
+    ],
+    "scripts": {
+        "dev:frontend": "pnpm --filter gost-frontend dev",
+        "dev:backend": "pnpm --filter gost-backend dev",
+        "dev": "concurrently --names \"FRONTEND,BACKEND\" -c \"bgBlue.bold,bgMagenta.bold\" \"pnpm run dev:frontend\" \"pnpm run dev:backend\""
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.3",
+        "concurrently": "^8.2.0"
+    },
+    "dependencies": {
+        "cors": "^2.8.5"
+    }
+}
